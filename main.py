@@ -2,7 +2,7 @@ import pdfplumber
 import re
 
 
-def pdf_to_text(pdf_file):
+def pdf_to_text(pdf_file, replace_map):
     """
     提取 pdf 文件中的文本
     :param pdf_file: 文件列表
@@ -19,49 +19,58 @@ def pdf_to_text(pdf_file):
             end = len(text) - 1
             while text[end] >= '0' and text[end] <= '9':
                 end -= 1
-            page_content = text[:end + 1].replace('．', '.').replace('. ', '.').replace('（', '(').replace('）', ')')
-            pdf_text += page_content
+            pdf_text += text[:end + 1]
+
+    # 处理 replace 映射
+    for key in replace_map:
+        pdf_text = pdf_text.replace(key, replace_map[key])
 
     return pdf_text
 
 
-def extract_question(pattern, text):
+def extract_item(pattern, text):
     """
-    获取对应的题目内容
+    获取对应的题目或答案
     :param pattern: 正则表达式
     :param text: pdf 文本
     :return: 题目内容
     """
 
     matches = re.findall(pattern, text, re.DOTALL)
+    # print(f"matches: {matches}")  # 是一个元组，第 0 个元素是我们要的
 
     if matches:
+        # 结果集
+        res = []
         # 取出每个匹配项进行检查
-        for i, match in enumerate(matches):
-            # 末尾可能包含章节
+        for i, (match, _) in enumerate(matches):
+
+            # 1. 末尾可能包含章节
             chapter_match = re.search(r"^第\s*\d+\s*讲", match, re.MULTILINE)
             if chapter_match:
                 # 获取到匹配项，即章节编号
                 chapter_id = chapter_match.group()
                 # 按 id 划分为两部分
-                # 取前面部分，即题目内容
-                question = match.split(chapter_id)[0]
-                matches[i] = question
-                # 不用管后面了
+                # 取前面部分，即 题目/答案
+                item = match.split(chapter_id)[0]
+                res.append(item)
                 continue
 
-            # 末尾可能包含标题
+            # 2. 末尾可能包含标题
             title_match = re.search(r"^\d+\.\d+", match, re.MULTILINE)
             if title_match:
                 # 获取到匹配项，即标题编号
                 title_id = title_match.group()
                 # 按 id 划分为两部分
-                # 取前面部分，即题目内容
-                question = match.split(title_id)[0]
-                matches[i] = question
+                # 取前面部分，即 题目/答案
+                item = match.split(title_id)[0]
+                res.append(item)
+                continue
+
+            # 3. 无事发生，直接作为结果
+            res.append(match)
         # 去掉匹配项两端空白，重组各个匹配项
-        result = "\n".join(match.strip() for match in matches)
-        return result
+        return "\n".join(match.strip() for match in res)
     else:
         print("未找到匹配内容")
 
@@ -105,15 +114,42 @@ def extract_questions_and_options(text):
 
 
 if __name__ == '__main__':
-    pdf_file = "data/保密知识概论（第二版）练习题2024.pdf"
-    pdf_text = pdf_to_text(pdf_file)
+
+    single_choice_pattern = r"单项选择题(.*?)(多项选择题|判断题)"
+    multiple_choice_pattern = r"多项选择题(.*?)(单项选择题|判断题)"
+    judgement_pattern = r"判断题(.*?)(多项选择题|单项选择题)"
+
+    question_pdf_file = "data/保密知识概论（第二版）练习题2024.pdf"
+    answer_pdf_file = "data/保密知识概论（第二版）练习题参考答案2024.pdf"
+
+    question_replace_map = {
+        '．': '.',
+        '. ': '.',
+        '（': '(',
+        '）': ')',
+    }
+    answer_replace_map = {
+        '○': 'T',
+        '×': 'F',
+    }
+
+    # 1. 处理问题
+    question_pdf_text = pdf_to_text(pdf_file=question_pdf_file, replace_map=question_replace_map)
 
     # 使用正则表达式提取题目
-    single_choice = extract_question(pattern=r"单项选择题(.*?)判断题", text=pdf_text)
-    multiple_choice = extract_question(pattern=r"多项选择题(.*?)单项选择题", text=pdf_text)
-    judgement = extract_question(pattern=r"判断题(.*?)多项选择题", text=pdf_text)
+    single_choice_que = extract_item(pattern=single_choice_pattern, text=question_pdf_text)
+    multiple_choice_que = extract_item(pattern=multiple_choice_pattern, text=question_pdf_text)
+    judgement_que = extract_item(pattern=judgement_pattern, text=question_pdf_text)
 
     # 提取好的题干和选项
-    single_choice_dict = extract_questions_and_options(text=single_choice)
-    multiple_choice_dict = extract_questions_and_options(text=multiple_choice)
+    single_choice_dict = extract_questions_and_options(text=single_choice_que)
+    multiple_choice_dict = extract_questions_and_options(text=multiple_choice_que)
+
+    # 2. 处理答案
+    answer_pdf_text = pdf_to_text(answer_pdf_file, answer_replace_map)
+
+    # 使用正则表达式提取答案
+    single_choice_ans = extract_item(pattern=single_choice_pattern, text=answer_pdf_text)
+    multiple_choice_ans = extract_item(pattern=multiple_choice_pattern, text=answer_pdf_text)
+    judgement_ans = extract_item(pattern=judgement_pattern, text=answer_pdf_text)
 
