@@ -21,11 +21,15 @@ def pdf_to_text(pdf_file, replace_map):
                 end -= 1
             pdf_text += text[:end + 1]
 
+    # 处理题目编号后的顿号
+    pdf_text = re.sub(r"([A-Za-z\d])、([^A-Za-z\d])", r"\1.\2", pdf_text)
+
     # 处理 replace 映射
     for key in replace_map:
         pdf_text = pdf_text.replace(key, replace_map[key])
 
-    return pdf_text
+    # 加上一个标识符，用于匹配最后一道单选题
+    return pdf_text + '判断题'
 
 
 def extract_item(pattern, text):
@@ -57,7 +61,11 @@ def extract_item(pattern, text):
                 continue
 
             # 2. 末尾可能包含标题
-            title_match = re.search(r"^\d+\.\d+", match, re.MULTILINE)
+            # 如：1.6 保守国家秘密是公民的义务”
+            # 开头是数字.数字，后面跟空格和非数字，并且后面不会出现括号
+            title_match = re.search(r"^\d+\.\d+ [^\d()]+$", match, re.MULTILINE)
+            # 废弃了：
+            # title_match = re.search(r"^\d+\.\d+", match, re.MULTILINE)
             if title_match:
                 # 获取到匹配项，即标题编号
                 title_id = title_match.group()
@@ -87,6 +95,7 @@ def extract_questions_and_options(text):
 
     # 用正则表达式匹配题干（数字加点的形式）和选项（A、B、C等）
     question_matches = re.findall(r'(\d+\..+?)(?=\d+\.)', text, flags=re.DOTALL)
+    print(question_matches)
     for question_match in question_matches:
         # 去掉题号、开头和结尾的空格、所有换行符
         cleaned_question = re.sub(r'^\d+\.', '', question_match.replace('\n', '').strip())
@@ -103,8 +112,8 @@ def extract_questions_and_options(text):
         if option_matches:
             for option_match in option_matches:
                 options.append(option_match.strip())  # A.XXXX
-        else:
-            print(f"没有选项，应为判断题")
+        # else:
+        #     print(f"没有选项，应为判断题")
 
         # 封装
         questions.append({
@@ -116,6 +125,16 @@ def extract_questions_and_options(text):
 
 def extract_answer(text):
     return text.strip().replace('\n', ' ').split(' ')
+
+def convert_content_to_json(quesions, answers):
+    assert len(quesions) == len(answers)
+    for question in quesions:
+        print(question)
+    for answer in answers:
+        print(answer)
+    for item in quesions:
+        print(item)
+    pass
 
 if __name__ == '__main__':
 
@@ -131,6 +150,7 @@ if __name__ == '__main__':
         '. ': '.',
         '（': '(',
         '）': ')',
+        '2归口组织': '2.归口组织',
     }
     answer_replace_map = {
         '○': 'T',
@@ -146,9 +166,10 @@ if __name__ == '__main__':
     judgement_que = extract_item(pattern=judgement_pattern, text=question_pdf_text)
 
     # 提取最终形式的题干和选项
-    single_choice_que = extract_questions_and_options(text=single_choice_que)
-    multiple_choice_que = extract_questions_and_options(text=multiple_choice_que)
-    judgement_que = extract_questions_and_options(text=judgement_que)
+    # + '5.' 是为了之后能匹配到最后一道题
+    single_choice_que = extract_questions_and_options(text=single_choice_que + '5.')
+    multiple_choice_que = extract_questions_and_options(text=multiple_choice_que + '5.')
+    judgement_que = extract_questions_and_options(text=judgement_que + '5.')
 
     # 2. 处理答案
     answer_pdf_text = pdf_to_text(answer_pdf_file, answer_replace_map)
@@ -162,3 +183,7 @@ if __name__ == '__main__':
     single_choice_ans = extract_answer(text=single_choice_ans)
     multiple_choice_ans = extract_answer(text=multiple_choice_ans)
     judgement_ans = extract_answer(text=judgement_ans)
+
+    convert_content_to_json(single_choice_que, single_choice_ans)
+    convert_content_to_json(multiple_choice_que, multiple_choice_ans)
+    convert_content_to_json(judgement_que, judgement_ans)
