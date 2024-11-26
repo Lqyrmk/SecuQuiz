@@ -103,6 +103,8 @@ def extract_questions_and_options(text):
         if option_matches:
             for option_match in option_matches:
                 options.append(option_match.strip())  # A.XXXX
+        else:
+            print(f"没有选项，应为判断题")
 
         # 封装
         questions.append({
@@ -112,6 +114,8 @@ def extract_questions_and_options(text):
 
     return questions
 
+def extract_answer(text):
+    return text.strip().replace('\n', ' ').split(' ')
 
 if __name__ == '__main__':
 
@@ -141,9 +145,10 @@ if __name__ == '__main__':
     multiple_choice_que = extract_item(pattern=multiple_choice_pattern, text=question_pdf_text)
     judgement_que = extract_item(pattern=judgement_pattern, text=question_pdf_text)
 
-    # 提取好的题干和选项
-    single_choice_dict = extract_questions_and_options(text=single_choice_que)
-    multiple_choice_dict = extract_questions_and_options(text=multiple_choice_que)
+    # 提取最终形式的题干和选项
+    single_choice_que = extract_questions_and_options(text=single_choice_que)
+    multiple_choice_que = extract_questions_and_options(text=multiple_choice_que)
+    judgement_que = extract_questions_and_options(text=judgement_que)
 
     # 2. 处理答案
     answer_pdf_text = pdf_to_text(answer_pdf_file, answer_replace_map)
@@ -153,3 +158,7 @@ if __name__ == '__main__':
     multiple_choice_ans = extract_item(pattern=multiple_choice_pattern, text=answer_pdf_text)
     judgement_ans = extract_item(pattern=judgement_pattern, text=answer_pdf_text)
 
+    # 提取最终形式的答案
+    single_choice_ans = extract_answer(text=single_choice_ans)
+    multiple_choice_ans = extract_answer(text=multiple_choice_ans)
+    judgement_ans = extract_answer(text=judgement_ans)
