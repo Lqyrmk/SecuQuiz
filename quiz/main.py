@@ -24,33 +24,38 @@ class Question(object):
         # 用于校验的回答
         self.validation_answer_str = ''
 
-        print(self.type)
+        # 用户可见的选项
+        self.visual_options_str = ''
+        # “新选项 -> 旧选项” 映射，用于对答案
+        self.options_mapping = defaultdict(str)
+
+        # 用户可见的答案
+        self.visual_answer = ''
+
+        print(self.type)  # 测试用
 
         if self.type == JUDGE_TYPE:
-            # 判断题不会变换选项，答案是统一的
+            # 判断题的可见答案和真实答案是统一的
+            # 且不用处理选项
             self.visual_answer = self.answer
         else:
-            # 预处理选项
-            self.process_options()
+            # 选择题需要预处理选项和答案
+            self.process_options_and_answer()
 
-    def process_options(self):
+    def process_options_and_answer(self):
         # 打乱选项
         random.shuffle(self.options)
         # 在逻辑中处理用户可见形式的答案
-        # “新选项 -> 旧选项” 映射，用于对答案
-        self.options_mapping = defaultdict(str)
-        visual_answer = ''
         for i, info in enumerate(self.options):
             option = chr(i + ord('A'))  # 新选项
             self.options_mapping[option] = info  # 旧选项
             # 根据 旧选项是否为答案 得出 新选项是否为答案
             if info[0] in self.answer:  # 'ABCD'
-                visual_answer += option
-        print(visual_answer)
-        self.visual_answer = ''.join(sorted(visual_answer)).strip()  # 排序
+                self.visual_answer += option
 
-        # 用户可见的选项
-        self.visual_options_str = ''
+        print(self.visual_answer)
+        self.visual_answer = ''.join(sorted(self.visual_answer)).strip()  # 排序
+
         # 在 Python 3.7 及以上版本中，keys() 返回的键是有序的，即插入顺序
         # 这里插入顺序正好是按字母顺序
         for c, option in self.options_mapping.items():
@@ -78,10 +83,7 @@ class Question(object):
         return self.validation_answer_str == self.answer
 
     def __str__(self):
-        return f"{self.visual_id}. {self.content} ({TYPE_MAPPING[self.type]})\n{self.visual_options_str}\n"
-
-    def __repr__(self):
-        return f"Question('{self.content}', {self.options}, {self.answer}, {self.type}, {self.options_mapping})"
+        return f"{self.visual_id}. {self.content.split('.')[1]} ({TYPE_MAPPING[self.type]})\n{self.visual_options_str}\n"
 
 
 def load_questions_and_answers(type):
