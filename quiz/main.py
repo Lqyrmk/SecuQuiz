@@ -21,8 +21,9 @@ class Question(object):
 
         # 用户的直接回答
         self.direct_answer = ''
+        self.direct_answer_detail = ''
         # 用于校验的回答
-        self.validation_answer_str = ''
+        self.validation_answer = ''
 
         # 用户可见的选项
         self.visual_options_str = ''
@@ -31,13 +32,12 @@ class Question(object):
 
         # 用户可见的答案
         self.visual_answer = ''
-
-        print(self.type)  # 测试用
+        self.visual_answer_detail = ''
 
         if self.type == JUDGE_TYPE:
             # 判断题的可见答案和真实答案是统一的
             # 且不用处理选项
-            self.visual_answer = self.answer
+            self.visual_answer = self.visual_answer_detail = self.answer
         else:
             # 选择题需要预处理选项和答案
             self.process_options_and_answer()
@@ -46,15 +46,20 @@ class Question(object):
         # 打乱选项
         random.shuffle(self.options)
         # 在逻辑中处理用户可见形式的答案
+        visual_answer = ''
+        visual_answer_detail = []
         for i, info in enumerate(self.options):
             option = chr(i + ord('A'))  # 新选项
             self.options_mapping[option] = info  # 旧选项
             # 根据 旧选项是否为答案 得出 新选项是否为答案
             if info[0] in self.answer:  # 'ABCD'
-                self.visual_answer += option
+                visual_answer += option  # 新选项
+                visual_answer_detail.append(option + info[1:])  # 新选项 拼上 旧选项内容
 
-        print(self.visual_answer)
-        self.visual_answer = ''.join(sorted(self.visual_answer)).strip()  # 排序
+        # print(self.visual_answer)
+        # 按顺序处理的，所以答案已经排好序了
+        self.visual_answer = visual_answer
+        self.visual_answer_detail = '\n'.join(visual_answer_detail)
 
         # 在 Python 3.7 及以上版本中，keys() 返回的键是有序的，即插入顺序
         # 这里插入顺序正好是按字母顺序
@@ -68,19 +73,22 @@ class Question(object):
         if self.type == JUDGE_TYPE:
             # 判断题，输入即答案，如果有多个输入，选择其中第一个
             self.direct_answer = ans_options[0]
-            self.validation_answer_str = ans_options[0]
+            self.direct_answer_detail = ans_options[0]
+            self.validation_answer = ans_options[0]
         else:
             # 排序一下就是直接回答
             self.direct_answer = ''.join(sorted(ans_options))
+            direct_answer_detail = [option + self.options_mapping[option][1:] for option in self.direct_answer]
+            self.direct_answer_detail = '\n'.join(direct_answer_detail)
             # 获取真实选项信息
             options = [self.options_mapping[ans_option] for ans_option in ans_options]
             # 获取真实选项
             options = [option.split('.')[0] for option in options]
             options.sort()
             # 排序，重组
-            self.validation_answer_str = ''.join(options)
+            self.validation_answer = ''.join(options)
         # 对答案
-        return self.validation_answer_str == self.answer
+        return self.validation_answer == self.answer
 
     def __str__(self):
         return f"{self.visual_id}. {self.content.split('.')[1]} ({TYPE_MAPPING[self.type]})\n{self.visual_options_str}\n"
@@ -115,9 +123,14 @@ def generate_questions(quiz_data, num_questions):
         ans_options = input('请输入答案（判断题请用 T 或 F 表示）：')
         if question.answer_question(ans_options):
             correct_cnt += 1
-            print(f'回答正确！你的选项为 {question.direct_answer}\n')
+            print(f"\n回答正确！答案为 {question.visual_answer_detail}\n")
         else:
-            print(f'回答错误！你的选项为 {question.direct_answer} ，正确答案为 {question.visual_answer}\n')
+            print(f"\n回答错误！\n你的答案为：{question.direct_answer}")
+            if question.type != JUDGE_TYPE:
+                print(f"{question.direct_answer_detail}\n")
+            print(f"正确答案为：{question.visual_answer}")
+            if question.type != JUDGE_TYPE:
+                print(f"{question.visual_answer_detail}\n")
 
         # input('按回车键继续...')
         # 清空控制台
